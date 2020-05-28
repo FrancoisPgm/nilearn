@@ -32,7 +32,7 @@ def _prepare_line(edges, nodes):
 
 
 def _get_connectome(adjacency_matrix, coords, threshold=None,
-                    marker_size=None, cmap=cm.cold_hot, symmetric_cmap=True):
+                    marker_size=None, cmap=cm.blue_red, symmetric_cmap=True):
     connectome = {}
     coords = np.asarray(coords, dtype='<f4')
     adjacency_matrix = np.nan_to_num(adjacency_matrix, copy=True)

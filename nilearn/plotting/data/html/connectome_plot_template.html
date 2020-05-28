@@ -80,19 +80,35 @@
         function updateTime() {
            let info = connectomeInfo['connectome']
            let time = getTime();
-           console.log("WESH");
-           console.log(time);
-           console.log(connectomeInfo['connectome']['colors'][time])
-           var update = {marker: {
-                             size: info["marker_size"],
-                             color: info["colors"][time],
-                             colorscale: info["colorscale"],
-                             cmin: info["cmin"],
-                             cmax: info["cmax"]
-                          }}
-           //Plotly.restyle("connectome-plot", {'marker.color': connectomeInfo['connectome']['colors'][time]});
-           Plotly.restyle("connectome-plot", update);
-           //updateMarkers(time);
+           changeColors(time);
+           // var update = {marker: {
+           //                   opactity: 0.75,
+           //                   size: info["marker_size"],
+           //                   color: info["colors"][time],
+           //                   colorscale: info["colorscale"],
+           //                   cmin: info["cmin"],
+           //                   cmax: info["cmax"]
+           //                }}
+           // Plotly.restyle("connectome-plot", update);
+        }
+
+        function changeColors(time){
+          let info = connectomeInfo['connectome'];
+          var newFrames = [
+            {name:'newFrame', data:[{marker:{
+                              opactity: 0.75,
+                              size: info["marker_size"],
+                              color: info["colors"][time],
+                              colorscale: info["colorscale"],
+                              cmin: info["cmin"],
+                              cmax: info["cmax"]
+                           }}]}
+          ];
+          Plotly.animate('connectome-plot', newFrames, {
+            transition: {
+                duration: 10
+            }
+          });
         }
 
         function surfaceRelayout(){
