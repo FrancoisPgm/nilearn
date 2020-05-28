@@ -7,11 +7,19 @@
     $INSERT_JS_LIBRARIES_HERE
     <script>
         var connectomeInfo = $INSERT_CONNECTOME_JSON_HERE;
+        if (connectomeInfo["connectome"]["4D"]) {
+          connectomeInfo["connectome"]["colors"] = connectomeInfo["connectome"]['values'].map(x => Array.from(decodeBase64(x, "float32")));
+        }
         var data = [];
 
         function getOpacity(){
             let opacity = $("#opacity-range").val();
             return opacity == 100 ? 1 : opacity / 300;
+        }
+
+        function getTime(){
+            let time = $("#time-range").val();
+            return time;
         }
 
         function makePlot(surface, hemisphere, divId) {
@@ -69,6 +77,24 @@
                          getConfig());
         }
 
+        function updateTime() {
+           let info = connectomeInfo['connectome']
+           let time = getTime();
+           console.log("WESH");
+           console.log(time);
+           console.log(connectomeInfo['connectome']['colors'][time])
+           var update = {marker: {
+                             size: info["marker_size"],
+                             color: info["colors"][time],
+                             colorscale: info["colorscale"],
+                             cmin: info["cmin"],
+                             cmax: info["cmax"]
+                          }}
+           //Plotly.restyle("connectome-plot", {'marker.color': connectomeInfo['connectome']['colors'][time]});
+           Plotly.restyle("connectome-plot", update);
+           //updateMarkers(time);
+        }
+
         function surfaceRelayout(){
             return updateLayout("connectome-plot", "select-view", false);
         }
@@ -79,6 +105,36 @@
                 addMarkers();
                 return;
             }
+
+            if (info["4D"]){
+                for (let attribute of ["con_x", "con_y", "con_z"]) {
+                    if (!(attribute in info)) {
+                        info[attribute] = Array.from(decodeBase64(
+                            info["_" + attribute], "float32"));
+                    }
+                }
+                //info["colors"] = Array.from(decodeBase64(info['values'][0], "float32"));
+                //connectomeInfo["connectome"]["colors"] = info['values'].map(x => Array.from(decodeBase64(x, "float32")));
+                console.log("COUCOU");
+                console.log(connectomeInfo["connectome"]["colors"][0]);
+                Plotly.plot('connectome-plot', [{
+                    type: 'scatter3d',
+                    mode: 'markers',
+                    x: info["con_x"],
+                    y: info["con_y"],
+                    z: info["con_z"],
+                    opacity: 1,
+                    marker: {
+                        size: info["marker_size"],
+                        color: connectomeInfo["connectome"]["colors"][0],
+                        colorscale: info["colorscale"],
+                        cmin: info["cmin"],
+                        cmax: info["cmax"]
+                    }
+                }]);
+                return;
+            }
+
 
             for (let attribute of ["con_x", "con_y", "con_z", "con_w"]) {
                 if (!(attribute in info)) {
@@ -152,7 +208,10 @@
                 });
                 $(window).resize(surfaceRelayout);
                 $("#opacity-range").change(updateOpacity);
-
+                if (connectomeInfo["connectome"]["4D"]) {
+                    $('body').append('<input id="time-range" title="time" type="range" min="0" max="100" value="0"/>');
+                    $("#time-range").change(updateTime);
+                }
             });
     </script>
 </head>
@@ -169,7 +228,7 @@
         <option value="bottom">view: Bottom</option>
         <option value="custom">view: -</option>
     </select>
-    <input id="opacity-range" type="range" min="0" max="100" value="30"/>
+    <input id="opacity-range" title="opacity" type="range" min="0" max="100" value="30"/>
 
 </body>
 

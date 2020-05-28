@@ -2,11 +2,15 @@ import json
 
 import numpy as np
 from scipy import sparse
+from io import BytesIO
 
-from nilearn._utils import rename_parameters
+from nilearn._utils import rename_parameters, check_niimg_4d
+from nilearn._utils.niimg import _safe_get_data
+from nilearn.image.resampling import coord_transform
 from .. import datasets
 from . import cm
 
+from .html_stat_map import _bytesIO_to_base64
 from .js_plotting_utils import (add_js_lib, mesh_to_plotly,
                                 encode, colorscale, get_html_template,
                                 to_color_strings)
@@ -60,6 +64,33 @@ def _get_connectome(adjacency_matrix, coords, threshold=None,
     connectome['marker_size'] = marker_size
     return connectome
 
+def _get_volume(img, threshold=0, marker_size=3, cmap=cm.cold_hot,
+                symmetric_cmap=True):
+    connectome = {}
+    img = check_niimg_4d(img)
+    data = _safe_get_data(img)
+    mask = np.abs(data[:,:,:,0]) > threshold
+    i, j, k = mask.nonzero()
+    x, y, z = coord_transform(i, j, k, img.affine)
+    for coord, cname in [(x, "x"), (y, "y"), (z, "z")]:
+        connectome["_con_{}".format(cname)] = encode(
+            np.asarray(coord, dtype='<f4'))
+    colors = colorscale(cmap, data.ravel(),
+                        symmetric_cmap=symmetric_cmap)
+    connectome['colorscale'] = colors['colors']
+    connectome['cmin'] = float(colors['vmin'])
+    connectome['cmax'] = float(colors['vmax'])
+    #connectome['marker_color'] = [to_color_strings(col) for col in colors]
+    connectome['marker_color'] = [to_color_strings('red')]
+    #values = BytesIO()
+    #np.save(values, np.moveaxis(np.array(data[i,j,k], dtype='<f4'), -1, 0))
+    values = [encode(np.asarray(data[i,j,k,t], dtype='<f4')) for t in range(100)]
+    #values = np.moveaxis(np.asarray(data[i,j,k,:100], dtype='<f4'), -1, 0)
+    connectome['values'] = values
+    #connectome['values'] = _bytesIO_to_base64(values)
+    #connectome['values'] = np.moveaxis(np.array(data, dtype='<f4'), -1, 0)
+    #connectome['markers_only'] = True
+    return connectome
 
 def _get_markers(coords, colors):
     connectome = {}
@@ -229,4 +260,71 @@ def view_markers(marker_coords, marker_color=None, marker_size=5.,
     connectome_info["marker_size"] = marker_size
     connectome_info['title'] = title
     connectome_info['title_fontsize'] = title_fontsize
+    return _make_connectome_html(connectome_info)
+
+
+def view_volume(img, threshold=0, marker_size=3., cmap=cm.bwr, symmetric_cmap=True,
+                 colorbar=True, colorbar_height=.5,
+                 colorbar_fontsize=11, title=None, title_fontsize=16):
+    """
+    Insert a 4d plot of a brain into an HTML page.
+
+    Parameters
+    ----------
+    img : Nifti image of a time-series.
+
+    marker_size : float or array-like, optional (default=3.)
+        Size of the markers showing the seeds in pixels.
+
+    cmpa :
+
+    symmetric_cmap :
+
+    colorbar : bool, optional (default=True)
+        add a colorbar
+
+    colorbar_height : float, optional (default=.5)
+        height of the colorbar, relative to the figure height
+
+    colorbar_fontsize : int, optional (default=25)
+        fontsize of the colorbar tick labels
+
+    title : str, optional (default=None)
+        title for the plot
+
+    title_fontsize : int, optional (default=25)
+        fontsize of the title
+
+    Returns
+    -------
+    ConnectomeView : plot of the markers.
+        It can be saved as an html page or rendered (transparently) by the
+        Jupyter notebook. Useful methods are :
+
+        - 'resize' to resize the plot displayed in a Jupyter notebook
+        - 'save_as_html' to save the plot to a file
+        - 'open_in_browser' to save the plot and open it in a web browser.
+
+    See Also
+    --------
+    nilearn.plotting.plot_connectome:
+        projected views of a connectome in a glass brain.
+
+    nilearn.plotting.view_connectome:
+        interactive plot of a connectome.
+
+    nilearn.plotting.view_surf, nilearn.plotting.view_img_on_surf:
+        interactive view of statistical maps or surface atlases on the cortical
+        surface.
+
+    """
+
+    connectome_info = _get_volume(img, threshold, marker_size, cmap, symmetric_cmap)
+    connectome_info["4D"] = True
+    connectome_info["marker_size"] = marker_size
+    connectome_info['title'] = title
+    connectome_info['title_fontsize'] = title_fontsize
+    connectome_info['colorbar'] = colorbar
+    connectome_info['cbar_height'] = colorbar_height
+    connectome_info['cbar_fontsize'] = colorbar_fontsize
     return _make_connectome_html(connectome_info)
