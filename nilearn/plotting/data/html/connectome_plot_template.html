@@ -80,31 +80,28 @@
         function updateTime() {
            let info = connectomeInfo['connectome']
            let time = getTime();
-           changeColors(time);
-           // var update = {marker: {
-           //                   opactity: 0.75,
-           //                   size: info["marker_size"],
-           //                   color: info["colors"][time],
-           //                   colorscale: info["colorscale"],
-           //                   cmin: info["cmin"],
-           //                   cmax: info["cmax"]
-           //                }}
-           // Plotly.restyle("connectome-plot", update);
+           // changeColors(time);
+           var update = {marker: {
+                             size: info["marker_size"],
+                             color: info["colors"][time],
+                             colorscale: info["colorscale"],
+                             cmin: info["cmin"],
+                             cmax: info["cmax"]
+                          }}
+           Plotly.restyle("connectome-plot", update);
         }
 
         function changeColors(time){
           let info = connectomeInfo['connectome'];
-          var newFrames = [
-            {name:'newFrame', data:[{marker:{
-                              opactity: 0.75,
-                              size: info["marker_size"],
-                              color: info["colors"][time],
-                              colorscale: info["colorscale"],
-                              cmin: info["cmin"],
-                              cmax: info["cmax"]
-                           }}]}
-          ];
-          Plotly.animate('connectome-plot', newFrames, {
+          var data = [{
+            marker:{
+              size: info["marker_size"],
+              color: info["colors"][time],
+              colorscale: info["colorscale"],
+              cmin: info["cmin"],
+              cmax: info["cmax"]
+           }}];
+          Plotly.animate('connectome-plot', data, {
             transition: {
                 duration: 10
             }
@@ -129,10 +126,6 @@
                             info["_" + attribute], "float32"));
                     }
                 }
-                //info["colors"] = Array.from(decodeBase64(info['values'][0], "float32"));
-                //connectomeInfo["connectome"]["colors"] = info['values'].map(x => Array.from(decodeBase64(x, "float32")));
-                console.log("COUCOU");
-                console.log(connectomeInfo["connectome"]["colors"][0]);
                 Plotly.plot('connectome-plot', [{
                     type: 'scatter3d',
                     mode: 'markers',
@@ -225,8 +218,7 @@
                 $(window).resize(surfaceRelayout);
                 $("#opacity-range").change(updateOpacity);
                 if (connectomeInfo["connectome"]["4D"]) {
-                    $('body').append('<input id="time-range" title="time" type="range" min="0" max="100" value="0"/>');
-                    $("#time-range").change(updateTime);
+                    $('body').append('<input id="time-range" oninput="updateTime()" title="time" type="range" min="0" max="100" value="0"/>');
                 }
             });
     </script>
