@@ -64,14 +64,17 @@ def _get_connectome(adjacency_matrix, coords, threshold=None,
     connectome['marker_size'] = marker_size
     return connectome
 
-def _get_volume(img, threshold=0, marker_size=3, cmap=cm.cold_hot,
-                symmetric_cmap=True):
+def _get_volume(img, threshold=0, stride=1, t_start=0, t_end=-1, n_t=50,
+                marker_size=3, cmap=cm.cold_hot, symmetric_cmap=True):
     connectome = {}
     img = check_niimg_4d(img)
-    data = _safe_get_data(img)
+    if t_end < 0:
+        t_end = img.shape[3] + t_end
+    t_idx = np.round(np.linspace(t_start, t_end, n_t)).astype(int)
+    data = _safe_get_data(img)[::stride,::stride,::stride,t_idx]
     mask = np.abs(data[:,:,:,0]) > threshold
     i, j, k = mask.nonzero()
-    x, y, z = coord_transform(i, j, k, img.affine)
+    x, y, z = coord_transform(i*stride, j*stride, k*stride, img.affine)
     for coord, cname in [(x, "x"), (y, "y"), (z, "z")]:
         connectome["_con_{}".format(cname)] = encode(
             np.asarray(coord, dtype='<f4'))
@@ -80,16 +83,10 @@ def _get_volume(img, threshold=0, marker_size=3, cmap=cm.cold_hot,
     connectome['colorscale'] = colors['colors']
     connectome['cmin'] = float(colors['vmin'])
     connectome['cmax'] = float(colors['vmax'])
-    #connectome['marker_color'] = [to_color_strings(col) for col in colors]
-    connectome['marker_color'] = [to_color_strings('red')]
-    #values = BytesIO()
-    #np.save(values, np.moveaxis(np.array(data[i,j,k], dtype='<f4'), -1, 0))
-    values = [encode(np.asarray(data[i,j,k,t], dtype='<f4')) for t in range(100)]
-    #values = np.moveaxis(np.asarray(data[i,j,k,:100], dtype='<f4'), -1, 0)
+    connectome['n_time'] = n_t
+    values = [encode(np.asarray(data[i,j,k,t], dtype='<f4')) for t in range(data.shape[3])]
     connectome['values'] = values
-    #connectome['values'] = _bytesIO_to_base64(values)
-    #connectome['values'] = np.moveaxis(np.array(data, dtype='<f4'), -1, 0)
-    #connectome['markers_only'] = True
+
     return connectome
 
 def _get_markers(coords, colors):
@@ -263,9 +260,10 @@ def view_markers(marker_coords, marker_color=None, marker_size=5.,
     return _make_connectome_html(connectome_info)
 
 
-def view_volume(img, threshold=0, marker_size=3., cmap=cm.bwr, symmetric_cmap=True,
-                 colorbar=True, colorbar_height=.5,
-                 colorbar_fontsize=11, title=None, title_fontsize=16):
+def view_volume(img, threshold=0, stride=1, t_start=0, t_end=-1, n_t=50,
+                marker_size=3., opacity=0.8, cmap="plasma", symmetric_cmap=True,
+                colorbar=True, colorbar_height=.5, colorbar_fontsize=11,
+                title=None, title_fontsize=16):
     """
     Insert a 4d plot of a brain into an HTML page.
 
@@ -319,11 +317,13 @@ def view_volume(img, threshold=0, marker_size=3., cmap=cm.bwr, symmetric_cmap=Tr
 
     """
 
-    connectome_info = _get_volume(img, threshold, marker_size, cmap, symmetric_cmap)
+    connectome_info = _get_volume(img, threshold, stride, t_start, t_end, n_t,
+                                  marker_size, cmap, symmetric_cmap)
     connectome_info["4D"] = True
     connectome_info["marker_size"] = marker_size
     connectome_info['title'] = title
     connectome_info['title_fontsize'] = title_fontsize
+    connectome_info['opacity'] = opacity
     connectome_info['colorbar'] = colorbar
     connectome_info['cbar_height'] = colorbar_height
     connectome_info['cbar_fontsize'] = colorbar_fontsize
