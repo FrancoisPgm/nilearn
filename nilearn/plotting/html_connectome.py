@@ -64,17 +64,19 @@ def _get_connectome(adjacency_matrix, coords, threshold=None,
     connectome['marker_size'] = marker_size
     return connectome
 
-def _get_volume(img, threshold=0, stride=1, t_start=0, t_end=-1, n_t=50, t_r=None,
-                marker_size=3, cmap=cm.cold_hot, symmetric_cmap=True):
+def _get_volume(img, threshold=0, gm_mask=None, stride=1, t_start=0, t_end=-1, n_t=50, t_r=None,
+                marker_size=3, cmap=cm.cold_hot, symmetric_cmap=True, vmax=None, vmin=None):
     connectome = {}
     img = check_niimg_4d(img)
-    t_unit = "" if not t_r else " ms"
+    t_unit = "" if not t_r else " s"
     if not t_r:
         t_r = 1
     if t_end < 0:
         t_end = img.shape[3] + t_end
+    if not n_t:
+        n_t = t_end-t_start
     t_idx = np.round(np.linspace(t_start, t_end, n_t)).astype(int)
-    t_val = [str(t_r*t)+t_unit for t in t_idx]
+    t_labels = [str(t_r*t)+t_unit for t in t_idx]
     data = _safe_get_data(img)[::stride,::stride,::stride,t_idx]
     mask = np.abs(data[:,:,:,0]) > threshold
     i, j, k = mask.nonzero()
@@ -83,12 +85,15 @@ def _get_volume(img, threshold=0, stride=1, t_start=0, t_end=-1, n_t=50, t_r=Non
         connectome["_con_{}".format(cname)] = encode(
             np.asarray(coord, dtype='<f4'))
     colors = colorscale(cmap, data.ravel(),
-                        symmetric_cmap=symmetric_cmap)
+                        symmetric_cmap=symmetric_cmap, vmax=vmax, vmin=vmin)
+    if gm_mask:
+        gm_data = _safe_get_data(gm_mask)[::stride,::stride,::stride]
+        connectome['gm'] = encode(np.asarray(marker_size*(gm_data[i,j,k]), dtype='<f4'))
     connectome['colorscale'] = colors['colors']
     connectome['cmin'] = float(colors['vmin'])
     connectome['cmax'] = float(colors['vmax'])
     connectome['n_time'] = n_t
-    connectome['t_values'] = t_val
+    connectome['t_labels'] = t_labels
     values = [encode(np.asarray(data[i,j,k,t], dtype='<f4')) for t in range(data.shape[3])]
     connectome['values'] = values
 
@@ -265,42 +270,76 @@ def view_markers(marker_coords, marker_color=None, marker_size=5.,
     return _make_connectome_html(connectome_info)
 
 
-def view_volume(img, threshold=0, stride=1, t_start=0, t_end=-1, n_t=50, t_r=None,
-                marker_size=3., opacity=0.8, cmap="plasma", symmetric_cmap=True,
-                colorbar=True, colorbar_height=.5, colorbar_fontsize=11,
-                title=None, title_fontsize=16):
+def view_volume(img, threshold=0., gm_mask=None, stride=1, t_start=0, t_end=-1, n_t=100,
+                t_r=None, marker_size=3., opacity=1, cmap="cold_hot",
+                symmetric_cmap=True, vmax=None, vmin=None, colorbar=True,
+                colorbar_height=.5, colorbar_fontsize=11, title=None,
+                title_fontsize=16):
     """
-    Insert a 4d plot of a brain into an HTML page.
+    Insert a 4d plot of a Nifti image time-series into an HTML page.
 
     Parameters
     ----------
     img : Nifti image of a time-series.
 
-    marker_size : float or array-like, optional (default=3.)
+    threshold : float, optional (default=0.)
+        Only voxels with absolute value superior to threshold will be plotted.
+
+    stride : int, optional (default=1)
+        Stride bewteen plotted voxels.
+
+    t_start : int, optional (default=0)
+        Index of first time step to plot: the time dimension is truncated
+        between t_start and t_end.
+
+    t_end : int, optional (default=-1)
+        Index of last time step to plot: the time dimension is truncated between
+        t_start and t_end.
+
+    n_t : int, optional (default=100)
+        Number of time steps to plot: slider steps are the n_t steps evenly
+        spaced between t_start and t_end.
+        If None, every time step in the Nifti image between t_start and t_end is
+        plotted.
+
+    t_r : float, optional (default=None)
+        Used for slider labels. If None, the indices of time steps are displayed.
+
+    marker_size : float or array-like, optional (default=5.)
         Size of the markers showing the seeds in pixels.
 
-    cmpa :
+    opacity : float, oprional (default=1)
+        Opacity of the markers, must be between 0 and 1.
 
-    symmetric_cmap :
+    cmap : str or matplotlib colormap, optional (default="cold_hot")
+
+    symmetric_cmap : bool, optional (default=True)
+        Make colormap symmetric (ranging from -vmax to vmax).
+
+    vmax: float, optional (default=None)
+        Upper bound for plotting. If None, max value in the time series is used.
+
+    vmin: float, optional (default=None)
+        Lower bound for plotting. If None, min value in the time series is used.
 
     colorbar : bool, optional (default=True)
-        add a colorbar
+        Add a colorbar.
 
     colorbar_height : float, optional (default=.5)
-        height of the colorbar, relative to the figure height
+        Height of the colorbar, relative to the figure height.
 
     colorbar_fontsize : int, optional (default=25)
-        fontsize of the colorbar tick labels
+        Fontsize of the colorbar tick labels.
 
     title : str, optional (default=None)
-        title for the plot
+        Title for the plot.
 
     title_fontsize : int, optional (default=25)
-        fontsize of the title
+        Fontsize of the title.
 
     Returns
     -------
-    ConnectomeView : plot of the markers.
+    ConnectomeView : plot of the volume.
         It can be saved as an html page or rendered (transparently) by the
         Jupyter notebook. Useful methods are :
 
@@ -322,8 +361,8 @@ def view_volume(img, threshold=0, stride=1, t_start=0, t_end=-1, n_t=50, t_r=Non
 
     """
 
-    connectome_info = _get_volume(img, threshold, stride, t_start, t_end, n_t, t_r,
-                                  marker_size, cmap, symmetric_cmap)
+    connectome_info = _get_volume(img, threshold, gm_mask, stride, t_start, t_end, n_t, t_r,
+                                  marker_size, cmap, symmetric_cmap, vmax, vmin)
     connectome_info["4D"] = True
     connectome_info["marker_size"] = marker_size
     connectome_info['title'] = title

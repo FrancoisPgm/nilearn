@@ -10,16 +10,14 @@
         if (connectomeInfo["connectome"]["4D"]) {
           connectomeInfo["connectome"]["colors"] = connectomeInfo["connectome"]['values'].map(x => Array.from(decodeBase64(x, "float32")));
         }
+        if (connectomeInfo["connectome"]["gm"]) {
+          connectomeInfo["connectome"]["gm"] = decodeBase64(connectomeInfo["connectome"]["gm"], "float32");
+        }
         var data = [];
 
         function getOpacity(){
             let opacity = $("#opacity-range").val();
             return opacity == 100 ? 1 : opacity / 300;
-        }
-
-        function getTime(){
-            let time = $("#time-range").val();
-            return time;
         }
 
         function makePlot(surface, hemisphere, divId) {
@@ -39,7 +37,7 @@
               for (i = 0; i < connectomeInfo["connectome"]["n_time"]; i++) {
                 sliderSteps.push({
                   method: 'animate',
-                  label: connectomeInfo["connectome"]["t_values"][i],
+                  label: connectomeInfo["connectome"]["t_labels"][i],
                   args: [[i], {
                     mode: 'immediate',
                     transition: {duration: 10},
@@ -131,40 +129,23 @@
             //              getConfig());
         }
 
-        // function updateTime(time) {
-        //   let info = connectomeInfo['connectome']
-        //   // let time = getTime();
-        //   var update = {
-        //     marker: {
-        //       opacity: info["opacity"],
-        //       size: info["marker_size"],
-        //       color: info["colors"][time],
-        //       colorscale: info["colorscale"],
-        //       cmin: info["cmin"],
-        //       cmax: info["cmax"]
-        //       }
-        //   }
-        //   Plotly.restyle("connectome-plot", update);
-        //   $("#time-text").text(time);
-        // //   Plotly.animate('connectome-plot', {
-        // //     data:[{
-        // //         marker: {
-        // //             color: connectomeInfo['connectome']["colors"][time],
-        // //         }
-        // //     }],
-        // //     traces: [5]
-        // //   }, {
-        // //     mode: 'immediate'
-        // //   }, {
-        // //     transition:{duration:0}
-        // //   }, {
-        // //     frame: {
-        // //       duration: 0,
-        // //       redraw: false
-        // //     }
-        // //   });
-        // }
-
+        function showGm(show){
+          let info = connectomeInfo['connectome'];
+          let time = $("#time-range").val();
+          if (show) {
+            var update = {
+            "marker.size":info["gm"],
+            "marker.sizeref":0.5,
+            "marker.line.width":0
+            };
+          } else {
+            var update = {
+            "marker.size":info["marker_size"],
+            "marker.sizeref":1
+            };
+          }
+          Plotly.restyle("connectome-plot", update, [5]);
+        }
 
         function surfaceRelayout(){
             return updateLayout("connectome-plot", "select-view", false);
@@ -194,7 +175,7 @@
                             color: connectomeInfo['connectome']["colors"][i],
                         }
                     }],
-                    traces: [5]
+                    traces: [5,6]
                   })
                 }
 
@@ -292,13 +273,9 @@
                 });
                 $(window).resize(surfaceRelayout);
                 $("#opacity-range").change(updateOpacity);
-                // if (connectomeInfo["connectome"]["4D"]) {
-                //     $('body').append(`<button id="play-button" onclick="playTime()">Play</button>
-                //                       <input id="time-range" oninput="updateTime(this.value)"
-                //                       title="time" type="range" min="0"
-                //                       max="${connectomeInfo["connectome"]["n_time"]-1}"
-                //                       value="0"/><div id="time-text">0</div>`);
-                // }
+                if (connectomeInfo["connectome"]["gm"]) {
+                  $('body').append(`<input type="checkbox" id="show-gm" onclick="showGm(this.checked)">GM mask</button>`);
+                }
             });
     </script>
 </head>
