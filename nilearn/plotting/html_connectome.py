@@ -64,13 +64,17 @@ def _get_connectome(adjacency_matrix, coords, threshold=None,
     connectome['marker_size'] = marker_size
     return connectome
 
-def _get_volume(img, threshold=0, stride=1, t_start=0, t_end=-1, n_t=50,
+def _get_volume(img, threshold=0, stride=1, t_start=0, t_end=-1, n_t=50, t_r=None,
                 marker_size=3, cmap=cm.cold_hot, symmetric_cmap=True):
     connectome = {}
     img = check_niimg_4d(img)
+    t_unit = "" if not t_r else " ms"
+    if not t_r:
+        t_r = 1
     if t_end < 0:
         t_end = img.shape[3] + t_end
     t_idx = np.round(np.linspace(t_start, t_end, n_t)).astype(int)
+    t_val = [str(t_r*t)+t_unit for t in t_idx]
     data = _safe_get_data(img)[::stride,::stride,::stride,t_idx]
     mask = np.abs(data[:,:,:,0]) > threshold
     i, j, k = mask.nonzero()
@@ -84,6 +88,7 @@ def _get_volume(img, threshold=0, stride=1, t_start=0, t_end=-1, n_t=50,
     connectome['cmin'] = float(colors['vmin'])
     connectome['cmax'] = float(colors['vmax'])
     connectome['n_time'] = n_t
+    connectome['t_values'] = t_val
     values = [encode(np.asarray(data[i,j,k,t], dtype='<f4')) for t in range(data.shape[3])]
     connectome['values'] = values
 
@@ -260,7 +265,7 @@ def view_markers(marker_coords, marker_color=None, marker_size=5.,
     return _make_connectome_html(connectome_info)
 
 
-def view_volume(img, threshold=0, stride=1, t_start=0, t_end=-1, n_t=50,
+def view_volume(img, threshold=0, stride=1, t_start=0, t_end=-1, n_t=50, t_r=None,
                 marker_size=3., opacity=0.8, cmap="plasma", symmetric_cmap=True,
                 colorbar=True, colorbar_height=.5, colorbar_fontsize=11,
                 title=None, title_fontsize=16):
@@ -317,7 +322,7 @@ def view_volume(img, threshold=0, stride=1, t_start=0, t_end=-1, n_t=50,
 
     """
 
-    connectome_info = _get_volume(img, threshold, stride, t_start, t_end, n_t,
+    connectome_info = _get_volume(img, threshold, stride, t_start, t_end, n_t, t_r,
                                   marker_size, cmap, symmetric_cmap)
     connectome_info["4D"] = True
     connectome_info["marker_size"] = marker_size

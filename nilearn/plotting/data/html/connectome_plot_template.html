@@ -33,6 +33,59 @@
             data.push(info);
 
             let layout = getLayout("connectome-plot", "select-view", false);
+            if (connectomeInfo["connectome"]["4D"]) {
+              // layout["hovermode"] = "closest";
+              let sliderSteps = [];
+              for (i = 0; i < connectomeInfo["connectome"]["n_time"]; i++) {
+                sliderSteps.push({
+                  method: 'animate',
+                  label: connectomeInfo["connectome"]["t_values"][i],
+                  args: [[i], {
+                    mode: 'immediate',
+                    transition: {duration: 10},
+                    frame: {duration:10,redraw: false},
+                  }]
+                });
+              };
+              layout["sliders"] = [{
+                pad: {l: 130, t: -5},
+                active: 1,
+                currentvalue: {
+                  visible: true,
+                  prefix: 'time:',
+                  xanchor: 'right',
+                  font: {size: 11, color: '#666'}
+                },
+                steps: sliderSteps
+              }];
+              layout["updatemenus"] = [{
+                x: 0,
+                y: 0,
+                yanchor: 'top',
+                xanchor: 'left',
+                showactive: false,
+                direction: 'left',
+                type: 'buttons',
+                pad: {t: 20, r: 10},
+                buttons: [{
+                  method: 'animate',
+                  args: [null, {
+                    mode: 'immediate',
+                    fromcurrent: true,
+                    transition: {duration: 0},
+                    frame: {duration: 0, redraw: false}
+                  }],
+                  label: 'Play'
+                }, {
+                  method: 'animate',
+                  args: [[null], {
+                    mode: 'immediate',
+                    transition: {duration: 0},
+                    frame: {duration: 0, redraw: false}
+                  }],
+                  label: 'Pause'
+              }]}];
+            }
 
             layout['title'] = {
                 text: connectomeInfo['connectome']['title'],
@@ -72,56 +125,46 @@
             let opacity = getOpacity();
             data[0]["opacity"] = opacity;
             data[1]["opacity"] = opacity;
-            Plotly.react("connectome-plot", data,
-                         getLayout("connectome-plot", "select-view", false),
-                         getConfig());
+            Plotly.restyle("connectome-plot", {opacity: opacity}, [0,1]);
+            // Plotly.react("connectome-plot", data,
+            //              getLayout("connectome-plot", "select-view", false),
+            //              getConfig());
         }
 
-        function updateTime(time) {
-          let info = connectomeInfo['connectome']
-          // let time = getTime();
-          var update = {
-            marker: {
-              opacity: info["opacity"],
-              size: info["marker_size"],
-              color: info["colors"][time],
-              colorscale: info["colorscale"],
-              cmin: info["cmin"],
-              cmax: info["cmax"]
-              }
-          }
-          // Plotly.animate('connectome-plot', {
-          //   data:[{
-          //       marker: {
-          //           color: connectomeInfo['connectome']["colors"][time],
-          //       }
-          //   }],
-          //   traces: [5]
-          // });
-          console.log("COUCOU");
-          Plotly.restyle("connectome-plot", update);
-        }
-
-        // function changeColors(update){
-        //   let info = connectomeInfo['connectome'];
-        //   var data = [{
-        //     marker:{
+        // function updateTime(time) {
+        //   let info = connectomeInfo['connectome']
+        //   // let time = getTime();
+        //   var update = {
+        //     marker: {
+        //       opacity: info["opacity"],
         //       size: info["marker_size"],
         //       color: info["colors"][time],
         //       colorscale: info["colorscale"],
         //       cmin: info["cmin"],
         //       cmax: info["cmax"]
-        //    }}];
-        //   Plotly.animate('connectome-plot', data, {
-        //     transition: {
-        //         duration: 10
-        //     },
-        //     frame: {
-        //       duration: 10
-        //     }
-        //   });
-        //   console.log("COUCOU");
+        //       }
+        //   }
+        //   Plotly.restyle("connectome-plot", update);
+        //   $("#time-text").text(time);
+        // //   Plotly.animate('connectome-plot', {
+        // //     data:[{
+        // //         marker: {
+        // //             color: connectomeInfo['connectome']["colors"][time],
+        // //         }
+        // //     }],
+        // //     traces: [5]
+        // //   }, {
+        // //     mode: 'immediate'
+        // //   }, {
+        // //     transition:{duration:0}
+        // //   }, {
+        // //     frame: {
+        // //       duration: 0,
+        // //       redraw: false
+        // //     }
+        // //   });
         // }
+
 
         function surfaceRelayout(){
             return updateLayout("connectome-plot", "select-view", false);
@@ -141,7 +184,22 @@
                             info["_" + attribute], "float32"));
                     }
                 }
-                Plotly.plot('connectome-plot', [{
+
+                var frames = [];
+                for (i = 0; i < connectomeInfo["connectome"]["n_time"]; i++) {
+                  frames.push({
+                    name: i.toString(),
+                    data: [{
+                        marker: {
+                            color: connectomeInfo['connectome']["colors"][i],
+                        }
+                    }],
+                    traces: [5]
+                  })
+                }
+
+                Plotly.plot('connectome-plot', {
+                  data:[{
                     type: 'scatter3d',
                     mode: 'markers',
                     x: info["con_x"],
@@ -155,7 +213,9 @@
                         cmin: info["cmin"],
                         cmax: info["cmax"]
                     }
-                }]);
+                  }],
+                  frames: frames,
+                });
                 return;
             }
 
@@ -232,12 +292,13 @@
                 });
                 $(window).resize(surfaceRelayout);
                 $("#opacity-range").change(updateOpacity);
-                if (connectomeInfo["connectome"]["4D"]) {
-                    $('body').append(`<input id="time-range" oninput="updateTime(this.value)"
-                                      title="time" type="range" min="0"
-                                      max="${connectomeInfo["connectome"]["n_time"]-1}"
-                                      value="0"/>`);
-                }
+                // if (connectomeInfo["connectome"]["4D"]) {
+                //     $('body').append(`<button id="play-button" onclick="playTime()">Play</button>
+                //                       <input id="time-range" oninput="updateTime(this.value)"
+                //                       title="time" type="range" min="0"
+                //                       max="${connectomeInfo["connectome"]["n_time"]-1}"
+                //                       value="0"/><div id="time-text">0</div>`);
+                // }
             });
     </script>
 </head>
