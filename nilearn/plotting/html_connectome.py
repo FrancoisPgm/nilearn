@@ -4,7 +4,7 @@ import numpy as np
 from scipy import sparse
 from io import BytesIO
 
-from nilearn._utils import rename_parameters, check_niimg_4d
+from nilearn._utils import rename_parameters, check_niimg_4d, check_niimg_3d
 from nilearn._utils.niimg import _safe_get_data
 from nilearn.image.resampling import coord_transform
 from .. import datasets
@@ -64,7 +64,7 @@ def _get_connectome(adjacency_matrix, coords, threshold=None,
     connectome['marker_size'] = marker_size
     return connectome
 
-def _get_volume(img, threshold=0, gm_mask=None, stride=1, t_start=0, t_end=-1, n_t=50, t_r=None,
+def _get_volume(img, threshold=0, atlas=None, stride=1, t_start=0, t_end=-1, n_t=50, t_r=None,
                 marker_size=3, cmap=cm.cold_hot, symmetric_cmap=True, vmax=None, vmin=None):
     connectome = {}
     img = check_niimg_4d(img)
@@ -86,9 +86,11 @@ def _get_volume(img, threshold=0, gm_mask=None, stride=1, t_start=0, t_end=-1, n
             np.asarray(coord, dtype='<f4'))
     colors = colorscale(cmap, data.ravel(),
                         symmetric_cmap=symmetric_cmap, vmax=vmax, vmin=vmin)
-    if gm_mask:
-        gm_data = _safe_get_data(gm_mask)[::stride,::stride,::stride]
-        connectome['gm'] = encode(np.asarray(marker_size*(gm_data[i,j,k]), dtype='<f4'))
+    if atlas:
+        atlas = check_niimg_3d(atlas)
+        atlas_data = _safe_get_data(atlas)[::stride,::stride,::stride]
+        connectome['atlas'] = encode(np.asarray(atlas_data[i,j,k], dtype='<f4'))
+        connectome['atlas_nb'] = int(np.max(atlas_data))
     connectome['colorscale'] = colors['colors']
     connectome['cmin'] = float(colors['vmin'])
     connectome['cmax'] = float(colors['vmax'])
@@ -270,7 +272,7 @@ def view_markers(marker_coords, marker_color=None, marker_size=5.,
     return _make_connectome_html(connectome_info)
 
 
-def view_volume(img, threshold=0., gm_mask=None, stride=1, t_start=0, t_end=-1, n_t=100,
+def view_volume(img, threshold=0., atlas=None, stride=1, t_start=0, t_end=-1, n_t=100,
                 t_r=None, marker_size=3., opacity=1, cmap="cold_hot",
                 symmetric_cmap=True, vmax=None, vmin=None, colorbar=True,
                 colorbar_height=.5, colorbar_fontsize=11, title=None,
@@ -361,7 +363,7 @@ def view_volume(img, threshold=0., gm_mask=None, stride=1, t_start=0, t_end=-1, 
 
     """
 
-    connectome_info = _get_volume(img, threshold, gm_mask, stride, t_start, t_end, n_t, t_r,
+    connectome_info = _get_volume(img, threshold, atlas, stride, t_start, t_end, n_t, t_r,
                                   marker_size, cmap, symmetric_cmap, vmax, vmin)
     connectome_info["4D"] = True
     connectome_info["marker_size"] = marker_size

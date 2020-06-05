@@ -10,8 +10,8 @@
         if (connectomeInfo["connectome"]["4D"]) {
           connectomeInfo["connectome"]["colors"] = connectomeInfo["connectome"]['values'].map(x => Array.from(decodeBase64(x, "float32")));
         }
-        if (connectomeInfo["connectome"]["gm"]) {
-          connectomeInfo["connectome"]["gm"] = decodeBase64(connectomeInfo["connectome"]["gm"], "float32");
+        if (connectomeInfo["connectome"]["atlas"]) {
+          connectomeInfo["connectome"]["atlas"] = decodeBase64(connectomeInfo["connectome"]["atlas"], "float32");
         }
         var data = [];
 
@@ -34,7 +34,7 @@
             if (connectomeInfo["connectome"]["4D"]) {
               // layout["hovermode"] = "closest";
               let sliderSteps = [];
-              for (i = 0; i < connectomeInfo["connectome"]["n_time"]; i++) {
+              for (let i = 0; i < connectomeInfo["connectome"]["n_time"]; i++) {
                 sliderSteps.push({
                   method: 'animate',
                   label: connectomeInfo["connectome"]["t_labels"][i],
@@ -129,9 +129,35 @@
             //              getConfig());
         }
 
-        function showGm(show){
+        function selectAtlas() {
+          let atlas_idx = $("#atlas-select").val();
           let info = connectomeInfo['connectome'];
-          let time = $("#time-range").val();
+          if (atlas_idx > 0) {
+            let sizes = info["atlas"].map(x => info["marker_size"]*(x==atlas_idx));
+            var update = {
+              "marker.size":sizes,
+              "marker.sizeref":0.5,
+              "marker.line.width":0
+            }
+          } else {
+            var update = {
+              "marker.size":info["marker_size"],
+              "marker.sizeref":1
+            }
+          }
+          Plotly.restyle("connectome-plot", update, [5]);
+        }
+
+        function atlasColors() {
+          Plotly.restyle("connectome-plot", {
+            "marker.color":connectomeInfo['connectome']['atlas'],
+            "marker.cmin": 0,
+            "marker.cmax": connectomeInfo['connectome']['atlas_nb']+2
+          }, [5]);
+        }
+
+        function showGm(show) {
+          let info = connectomeInfo['connectome'];
           if (show) {
             var update = {
             "marker.size":info["gm"],
@@ -173,6 +199,8 @@
                     data: [{
                         marker: {
                             color: connectomeInfo['connectome']["colors"][i],
+                            cmin: connectomeInfo['connectome']["cmin"],
+                            cmax: connectomeInfo['connectome']["cmax"]
                         }
                     }],
                     traces: [5,6]
@@ -234,7 +262,6 @@
                     ],
                 }
             }]);
-
         }
 
         function addMarkers(){
@@ -275,6 +302,16 @@
                 $("#opacity-range").change(updateOpacity);
                 if (connectomeInfo["connectome"]["gm"]) {
                   $('body').append(`<input type="checkbox" id="show-gm" onclick="showGm(this.checked)">GM mask</button>`);
+                }
+                if (connectomeInfo["connectome"]["atlas"]) {
+                  let select = `<select id="atlas-select" oninput="selectAtlas()">
+                                <option value=0>ROI: all</option>`;
+                  for (let i = 1; i < connectomeInfo["connectome"]["atlas_nb"]+1; i++) {
+                    select += `<option value=${i}>ROI: ${i}</option>`;
+                  }
+                  select += `</select>`;
+                  $('body').append(select);
+                  $('body').append("<button onclick='atlasColors()'>atlas colors</button>");
                 }
             });
     </script>
